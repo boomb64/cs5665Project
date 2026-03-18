@@ -35,7 +35,7 @@ print("Configuring training parameters...")
 args = Seq2SeqTrainingArguments(
     output_dir="./training_checkpoints",
     report_to="none",               # Disables Weights & Biases tracking
-    evaluation_strategy="no",
+    eval_strategy="no",
     learning_rate=1e-4,
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
