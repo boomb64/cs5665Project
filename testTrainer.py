@@ -69,8 +69,8 @@ args = Seq2SeqTrainingArguments(
     gradient_accumulation_steps=4,
     num_train_epochs=15,
     save_strategy="no",  # Don't save intermediate checkpoints to save disk space
-    fp16=True,
-    bf16=False,  # Keep the Blackwell GPU speedup
+    fp16=False,
+    bf16=True,  # Keep the Blackwell GPU speedup
 
     # --- COMMENTED OUT TUNING & EVALUATION ---
     # eval_strategy="epoch",
