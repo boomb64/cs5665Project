@@ -17,6 +17,15 @@ print(f"Loading master training data from {MASTER_TRAIN_PATH}...")
 train_df = pd.read_csv(MASTER_TRAIN_PATH).dropna(subset=['transliteration', 'translation'])
 print(f"Loaded {len(train_df)} total training rows.")
 
+# --- THE MISSING SPELLCHECKER ---
+def normalize_akkadian(text):
+    text = str(text).lower()
+    text = text.replace("sz", "š").replace("s,", "ṣ").replace("t,", "ṭ").replace("h", "ḫ")
+    return text
+
+print("Standardizing Akkadian characters...")
+train_df['transliteration'] = train_df['transliteration'].apply(normalize_akkadian)
+
 # Convert directly to Hugging Face format (No train/test split needed for pure training)
 dataset = Dataset.from_pandas(train_df)
 
@@ -58,7 +67,7 @@ args = Seq2SeqTrainingArguments(
     learning_rate=3e-4,
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
-    num_train_epochs=5,
+    num_train_epochs=15,
     save_strategy="no",  # Don't save intermediate checkpoints to save disk space
     fp16=True,
     bf16=False,  # Keep the Blackwell GPU speedup
