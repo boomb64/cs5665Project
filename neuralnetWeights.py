@@ -6,14 +6,30 @@ from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainer, Seq2SeqTrainingArguments
 
 # --- 1. LOCAL FILE PATHS ---
-TRAIN_PATH = "train.csv"
+ORIGINAL_TRAIN_PATH = "train.csv"
+NEW_DATA_PATH = "training_ready_final.csv"  # <-- Your newly scraped data!
 OUTPUT_MODEL_DIR = "./akkadian_saved_model"
-# If you downloaded the model locally in the last step, change this to "./base_byt5_model"
 MODEL_NAME = "google/byt5-small"
 
-# --- 2. LOAD & PREPARE DATA ---
+# --- 2. LOAD & COMBINE DATA ---
 print("Loading training data...")
-train_df = pd.read_csv(TRAIN_PATH).dropna(subset=['transliteration', 'translation'])
+
+# Load the original Kaggle training data
+df_original = pd.read_csv(ORIGINAL_TRAIN_PATH).dropna(subset=['transliteration', 'translation'])
+print(f"Loaded {len(df_original)} original rows.")
+
+# Load your newly scraped dictionary
+df_new = pd.read_csv(NEW_DATA_PATH).dropna(subset=['transliteration', 'translation'])
+print(f"Loaded {len(df_new)} new scraped rows.")
+
+# Combine both datasets into one massive training set
+train_df = pd.concat([df_original, df_new], ignore_index=True)
+
+# Shuffle the combined dataset so the model doesn't just learn all original, then all new
+train_df = train_df.sample(frac=1, random_state=42).reset_index(drop=True)
+print(f"Total combined training rows: {len(train_df)}")
+
+# Convert to Hugging Face format
 dataset = Dataset.from_pandas(train_df)
 split_dataset = dataset.train_test_split(test_size=0.1, seed=42)
 
@@ -34,7 +50,6 @@ def preprocess_function(examples):
     labels = tokenizer(text_target=examples["translation"], max_length=512, truncation=True, padding="max_length")
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
-
 
 print("Tokenizing data...")
 tokenized_datasets = split_dataset.map(preprocess_function, batched=True)
@@ -85,14 +100,12 @@ args = Seq2SeqTrainingArguments(
     gradient_accumulation_steps=4,
     num_train_epochs=15,
     save_strategy="epoch",
-
-    # --- NEW: Evaluation Upgrades ---
-    predict_with_generate=True,  # Forces model to generate text for the compute_metrics function
-    generation_max_length=512,  # Gives it enough room to write the translation
+    predict_with_generate=True,
+    generation_max_length=512,
     load_best_model_at_end=True,
-    metric_for_best_model="geo_mean",  # Tell it to track your custom Kaggle score!
-    greater_is_better=True,  # Unlike loss, a HIGHER Kaggle score is better
-    bf16=True,  # 5070 Blackwell Superpower
+    metric_for_best_model="geo_mean",
+    greater_is_better=True,
+    bf16=True,
 )
 
 trainer = Seq2SeqTrainer(
@@ -101,10 +114,10 @@ trainer = Seq2SeqTrainer(
     train_dataset=tokenized_datasets["train"],
     eval_dataset=tokenized_datasets["test"],
     processing_class=tokenizer,
-    compute_metrics=compute_metrics  # <--- Plugs the custom grader into the loop
+    compute_metrics=compute_metrics
 )
 
-print("Starting neural network training with Kaggle Evaluation Metrics...")
+print("Starting neural network training with combined data...")
 trainer.train()
 
 # --- 7. SAVE THE FINAL WEIGHTS ---

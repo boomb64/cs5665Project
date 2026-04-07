@@ -1,13 +1,14 @@
-import requests
+import pandas as pd
+import glob
 
-# Test fetching the JSON file for the P361 bucket
-url = "https://aicuneiform.com/p/p361.json"
-data = requests.get(url).json()
+# Get a list of all CSVs in the directory
+csv_files = glob.glob("*.csv")
 
-# Let's print out the data specifically for P361099 to see how they labeled the English text
-if "P361099" in data:
-    print(data["P361099"])
-elif type(data) == list:
-    print(data[0])
-else:
-    print(data.keys())
+for file in csv_files:
+    print(f"\n--- {file} ---")
+    try:
+        # We use nrows=0 to only load the headers, making it instantaneous
+        df = pd.read_csv(file, nrows=0)
+        print("Columns:", df.columns.tolist())
+    except Exception as e:
+        print(f"Could not read {file}: {e}")
