@@ -1,6 +1,6 @@
 import pandas as pd
 import torch
-import numpy as np
+# import numpy as np
 # import sacrebleu  # <-- Commented out as it's only needed for evaluation/tuning
 from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainer, Seq2SeqTrainingArguments
@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainer, S
 # Now we just load the single master file that has the original data, scraped data, and dictionary
 MASTER_TRAIN_PATH = "training_ready_master.csv"
 OUTPUT_MODEL_DIR = "./akkadian_saved_model"
-MODEL_NAME = "google/byt5-base"
+MODEL_NAME = "google/byt5-small"
 
 # --- 2. LOAD DATA ---
 print(f"Loading master training data from {MASTER_TRAIN_PATH}...")
@@ -24,6 +24,7 @@ dataset = Dataset.from_pandas(train_df)
 print(f"Loading base ByT5 model ({MODEL_NAME})...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
+model.to("cuda")
 
 # Fix for Windows Tokenizer Hang
 cached_vocab = {k.content: v for v, k in sorted(tokenizer._added_tokens_decoder.items(), key=lambda item: item[0])}
@@ -54,12 +55,13 @@ print("Configuring training parameters...")
 args = Seq2SeqTrainingArguments(
     output_dir="./training_checkpoints",
     report_to="none",
-    learning_rate=1e-4,
+    learning_rate=3e-4,
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
-    num_train_epochs=15,
+    num_train_epochs=5,
     save_strategy="no",  # Don't save intermediate checkpoints to save disk space
-    bf16=True,  # Keep the Blackwell GPU speedup
+    fp16=True,
+    bf16=False,  # Keep the Blackwell GPU speedup
 
     # --- COMMENTED OUT TUNING & EVALUATION ---
     # eval_strategy="epoch",
@@ -68,6 +70,9 @@ args = Seq2SeqTrainingArguments(
     # load_best_model_at_end=True,
     # metric_for_best_model="geo_mean",
     # greater_is_better=True,
+    lr_scheduler_type="cosine",
+    warmup_steps=1500,  # <--- ADD THIS
+    weight_decay=0.01  # <--- ADD THIS (helps prevent overfitting)
 )
 
 trainer = Seq2SeqTrainer(
@@ -77,9 +82,6 @@ trainer = Seq2SeqTrainer(
     # eval_dataset=tokenized_datasets["test"],  # Commented out
     processing_class=tokenizer,
     # compute_metrics=compute_metrics    # Commented out
-    label_smoothing_factor=0.1,  # <--- ADD THIS
-    warmup_ratio=0.1,            # <--- ADD THIS
-    weight_decay=0.01           # <--- ADD THIS (helps prevent overfitting)
 )
 
 print("Starting full-throttle neural network training (No evaluation pauses)...")
