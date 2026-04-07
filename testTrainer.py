@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainer, S
 # Now we just load the single master file that has the original data, scraped data, and dictionary
 MASTER_TRAIN_PATH = "training_ready_master.csv"
 OUTPUT_MODEL_DIR = "./akkadian_saved_model"
-MODEL_NAME = "google/byt5-small"
+MODEL_NAME = "google/byt5-base"
 
 # --- 2. LOAD DATA ---
 print(f"Loading master training data from {MASTER_TRAIN_PATH}...")
@@ -77,6 +77,9 @@ trainer = Seq2SeqTrainer(
     # eval_dataset=tokenized_datasets["test"],  # Commented out
     processing_class=tokenizer,
     # compute_metrics=compute_metrics    # Commented out
+    label_smoothing_factor=0.1,  # <--- ADD THIS
+    warmup_ratio=0.1,            # <--- ADD THIS
+    weight_decay=0.01           # <--- ADD THIS (helps prevent overfitting)
 )
 
 print("Starting full-throttle neural network training (No evaluation pauses)...")
