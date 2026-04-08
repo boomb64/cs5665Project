@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainer, S
 
 # --- 1. LOCAL FILE PATHS ---
 # Now we just load the single master file that has the original data, scraped data, and dictionary
-MASTER_TRAIN_PATH = "training_ready_master.csv"
+MASTER_TRAIN_PATH = "training_ready_master_clean.csv"
 OUTPUT_MODEL_DIR = "./akkadian_saved_model"
 MODEL_NAME = "google/byt5-small"
 
@@ -45,7 +45,14 @@ def preprocess_function(examples):
     inputs = ["Translate Akkadian to English: " + str(ex) for ex in examples["transliteration"]]
     model_inputs = tokenizer(inputs, max_length=512, truncation=True, padding="max_length")
     labels = tokenizer(text_target=examples["translation"], max_length=512, truncation=True, padding="max_length")
-    model_inputs["labels"] = labels["input_ids"]
+
+    # --- CRITICAL FIX: Mask the padding tokens so the model doesn't learn to predict them ---
+    # We replace the pad_token_id (0) with -100 so the PyTorch loss function ignores them
+    labels_with_ignore_index = []
+    for label in labels["input_ids"]:
+        labels_with_ignore_index.append([l if l != tokenizer.pad_token_id else -100 for l in label])
+
+    model_inputs["labels"] = labels_with_ignore_index
     return model_inputs
 
 
